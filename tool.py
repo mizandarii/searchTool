@@ -59,7 +59,7 @@ class StringSearchTool:
         with ThreadPoolExecutor() as executor:
             positions_iter = executor.map(self._search_in_file, files_to_search, itertools.repeat(query))
 
-        
+        #combines file path and positions
         for file_path, positions in zip(files_to_search, positions_iter):
             if positions:
                 results[file_path] = positions
@@ -106,7 +106,7 @@ class StringSearchTool:
                     with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
                     for pos in positions:
-                        start = pos-20 
+                        start = max(0, pos - 20)
                         end = pos + len(query) + 20
                         context = content[start:end].replace("\n", " ")
                         print(f"  ...{context}...")
