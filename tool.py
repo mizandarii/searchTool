@@ -2,6 +2,7 @@ import os
 import json
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import itertools
 
 
 
@@ -10,7 +11,7 @@ class StringSearchTool:
         # list of ignored file extensions
         self.ignore_extensions = ['.png', '.jpg', '.jpeg', '.svg', '.exe', '.bin', '.gif', '.pdf']
 
-    #creates a list of files to go through
+    #creates a list of files to read
     def _collect_files(self, path):
         files_to_search = []
 
@@ -19,7 +20,7 @@ class StringSearchTool:
             if ext not in self.ignore_extensions:
                 files_to_search.append(path)
         elif os.path.isdir(path):
-            for root, dirs, files in os.walk(path):
+            for root, dir, files in os.walk(path):
                 for file in files:
                     ext = os.path.splitext(file)[1].lower()
                     if ext in self.ignore_extensions:
@@ -42,6 +43,7 @@ class StringSearchTool:
         start = 0
         while True:
             index = content.find(query, start)
+            #if string was not found in file
             if index == -1:
                 break
             positions.append(index)
@@ -52,16 +54,15 @@ class StringSearchTool:
     def search(self, path, query, output="res.json"):
         files_to_search = self._collect_files(path)
         results = {}
-
+        # creates a pool of threads and calls _search_in_file for each file_path
+        # itertools.repeat(query) gives a copy of query for each file
         with ThreadPoolExecutor() as executor:
-            futures = {executor.submit(self._search_in_file, file_path, query):file_path
-                for file_path in files_to_search}
-            
-            for future in as_completed(futures):
-                file_path = futures[future]
-                postitions = future.result()
-                if postitions:
-                    results[file_path] = postitions
+            positions_iter = executor.map(self._search_in_file, files_to_search, itertools.repeat(query))
+
+        
+        for file_path, positions in zip(files_to_search, positions_iter):
+            if positions:
+                results[file_path] = positions
 
 
             #save to json
@@ -69,7 +70,7 @@ class StringSearchTool:
             with open(output, "w", encoding="utf-8") as f:
                 json.dump(data_to_save, f, indent=4, ensure_ascii=False)
 
-            print(f"Results saved in {output}")
+        print(f"Results saved in {output}")
 
     #show results in different formats
     def show(self, json_file, format):
@@ -105,7 +106,7 @@ class StringSearchTool:
                     with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
                     for pos in positions:
-                        start = max(0, pos - 20)
+                        start = pos-20 
                         end = pos + len(query) + 20
                         context = content[start:end].replace("\n", " ")
                         print(f"  ...{context}...")
